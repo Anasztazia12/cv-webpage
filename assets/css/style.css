@@ -5,15 +5,15 @@
    Dark mode: terminal-inspired, toggled via [data-theme]
    ============================================ */
 :root {
-    --ink: #14161a;
+    --ink: #1a1625;
     --paper: #dbd7e9;
-    --paper-raised: #f8f9fa;
-    --muted: #6b7280;
-    --line: #e5e7eb;
+    --paper-raised: #f2f0f8;
+    --muted: #6b6478;
+    --line: #c7c1dc;
 
-    --accent: #050505;
+    --accent: #0d9488;
     --accent-light: #fbbf24;
-    --accent-soft: rgba(13, 148, 136, 0.08);
+    --accent-soft: rgba(13, 148, 136, 0.10);
 
     --tok-kw: #c026d3;
     --tok-str: #15803d;
