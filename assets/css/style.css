@@ -6,12 +6,12 @@
    ============================================ */
 :root {
     --ink: #14161a;
-    --paper: #ffffff;
+    --paper: #dbd7e9;
     --paper-raised: #f8f9fa;
     --muted: #6b7280;
     --line: #e5e7eb;
 
-    --accent: #097e74;
+    --accent: #050505;
     --accent-light: #fbbf24;
     --accent-soft: rgba(13, 148, 136, 0.08);
 
@@ -27,7 +27,7 @@
 
 /* ---------- Dark mode (terminal-inspired) ---------- */
 :root[data-theme="dark"] {
-    --ink: #e6e8eb;
+    --ink: #d1dae7;
     --paper: #0a0d10;
     --paper-raised: #12161a;
     --muted: #8a929b;
