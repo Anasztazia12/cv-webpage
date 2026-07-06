@@ -4,15 +4,53 @@
     var ctx = canvas.getContext('2d');
     var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    var width, height, dpr, particles;
-    var linkDistance = 70;
+    var width, height, dpr, stars;
     var running = true;
+    var startTime = Date.now();
 
-    /* A handful of contained drift zones instead of a full-page field */
-    var hotspots = [
-        { xRatio: 0.88, yRatio: 0.10, radius: 130, count: 7 },
-        { xRatio: 0.06, yRatio: 0.48, radius: 110, count: 6 },
-        { xRatio: 0.80, yRatio: 0.82, radius: 120, count: 6 }
+    /* Four constellations that swim slowly across the whole screen (left-right
+       and up-down) while their own stars wander a little individually. Each
+       one also occasionally drifts inward into a loose cluster before
+       re-forming its familiar outline. */
+    var constellations = [
+        {
+            xRatio: 0.5, yRatio: 0.28, scale: 220, driftSpeedX: 0.000028, driftSpeedY: 0.000041, phase: 0,
+            points: [
+                [0.00, 0.55], [0.05, 0.15], [0.35, 0.05], [0.30, 0.50],
+                [0.55, 0.00], [0.78, 0.10], [1.00, 0.30]
+            ],
+            lines: [[0, 1], [1, 2], [2, 3], [3, 0], [2, 4], [4, 5], [5, 6]],
+            bright: [0, 6]
+        },
+        {
+            xRatio: 0.5, yRatio: 0.74, scale: 145, driftSpeedX: 0.000033, driftSpeedY: 0.000023, phase: 2,
+            points: [
+                [0.15, 0.60], [0.10, 0.35], [0.35, 0.25], [0.35, 0.55],
+                [0.55, 0.15], [0.78, 0.10], [1.00, 0.00]
+            ],
+            lines: [[0, 1], [1, 2], [2, 3], [3, 0], [2, 4], [4, 5], [5, 6]],
+            bright: [0, 6]
+        },
+        {
+            /* Orion: shoulders, three-star belt, and feet */
+            xRatio: 0.26, yRatio: 0.5, scale: 190, driftSpeedX: 0.000023, driftSpeedY: 0.000036, phase: 4,
+            points: [
+                [0.15, 0.05], [0.85, 0.05], [0.35, 0.40], [0.50, 0.45],
+                [0.65, 0.50], [0.80, 0.90], [0.10, 0.90]
+            ],
+            lines: [[0, 2], [1, 4], [2, 3], [3, 4], [4, 5], [2, 6]],
+            bright: [0, 1]
+        },
+        {
+            /* Corona Borealis: a gentle semicircular arc of stars, the "crown" */
+            xRatio: 0.74, yRatio: 0.5, scale: 190, driftSpeedX: 0.000038, driftSpeedY: 0.000028, phase: 6,
+            points: [
+                [0.00, 0.60], [0.15, 0.25], [0.35, 0.05], [0.50, 0.00],
+                [0.65, 0.05], [0.85, 0.25], [1.00, 0.60]
+            ],
+            lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]],
+            bright: [3]
+        }
     ];
 
     function getDotRgb() {
@@ -27,26 +65,26 @@
         return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
     }
 
-    function seedParticles() {
-        particles = [];
-        hotspots.forEach(function (spot) {
-            var cx = spot.xRatio * width;
-            var cy = spot.yRatio * height;
-            for (var i = 0; i < spot.count; i++) {
-                var angle = Math.random() * Math.PI * 2;
-                var dist = Math.random() * spot.radius;
-                particles.push({
-                    cx: cx,
-                    cy: cy,
-                    radius: spot.radius,
-                    x: cx + Math.cos(angle) * dist,
-                    y: cy + Math.sin(angle) * dist,
-                    vx: (Math.random() - 0.5) * 0.2,
-                    vy: (Math.random() - 0.5) * 0.2,
-                    r: Math.random() < 0.25 ? 3.6 : 2.4,
-                    square: Math.random() < 0.2
-                });
-            }
+    function seedStars() {
+        stars = constellations.map(function (c) {
+            return {
+                config: c,
+                cx: c.xRatio * width,
+                cy: c.yRatio * height,
+                ampX: Math.min(width, height) * 0.24,
+                ampY: Math.min(width, height) * 0.2,
+                wander: c.points.map(function () {
+                    return {
+                        amp: 3 + Math.random() * 4,
+                        fx: 0.00025 + Math.random() * 0.00025,
+                        fy: 0.0002 + Math.random() * 0.0003,
+                        px: Math.random() * Math.PI * 2,
+                        py: Math.random() * Math.PI * 2
+                    };
+                }),
+                twinklePhases: c.points.map(function () { return Math.random() * Math.PI * 2; }),
+                sizeJitter: c.points.map(function () { return 0.85 + Math.random() * 0.3; })
+            };
         });
     }
 
@@ -59,55 +97,61 @@
         canvas.style.width = width + 'px';
         canvas.style.height = height + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        seedParticles();
+        seedStars();
+    }
+
+    function drawStar(x, y, r, alpha, rgb) {
+        var rgba = 'rgba(' + rgb.join(',') + ',' + alpha.toFixed(2) + ')';
+        ctx.save();
+        ctx.shadowBlur = r * 3.2;
+        ctx.shadowColor = rgba;
+        ctx.fillStyle = rgba;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     function draw() {
         var rgb = getDotRgb();
+        var t = Date.now() - startTime;
         ctx.clearRect(0, 0, width, height);
 
-        for (var i = 0; i < particles.length; i++) {
-            var p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
+        stars.forEach(function (group) {
+            var c = group.config;
+            var driftX = Math.sin(t * c.driftSpeedX + c.phase) * group.ampX;
+            var driftY = Math.cos(t * c.driftSpeedY + c.phase * 1.3) * group.ampY;
+            var originX = group.cx + driftX;
+            var originY = group.cy + driftY;
 
-            var dx = p.x - p.cx;
-            var dy = p.y - p.cy;
-            if (Math.sqrt(dx * dx + dy * dy) > p.radius) {
-                p.vx -= dx * 0.0015;
-                p.vy -= dy * 0.0015;
-            }
+            var abs = c.points.map(function (p, i) {
+                var w = group.wander[i];
+                var wx = reduceMotion ? 0 : Math.sin(t * w.fx + w.px) * w.amp;
+                var wy = reduceMotion ? 0 : Math.cos(t * w.fy + w.py) * w.amp;
+                return [
+                    originX + (p[0] - 0.5) * c.scale + wx,
+                    originY + (p[1] - 0.5) * c.scale + wy
+                ];
+            });
 
-            for (var j = i + 1; j < particles.length; j++) {
-                var q = particles[j];
-                var ddx = p.x - q.x;
-                var ddy = p.y - q.y;
-                var dist = Math.sqrt(ddx * ddx + ddy * ddy);
-                if (dist < linkDistance) {
-                    var alpha = (1 - dist / linkDistance) * 0.18;
-                    ctx.strokeStyle = 'rgba(' + rgb.join(',') + ',' + alpha + ')';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(p.x, p.y);
-                    ctx.lineTo(q.x, q.y);
-                    ctx.stroke();
-                }
-            }
-        }
-
-        for (var k = 0; k < particles.length; k++) {
-            var pt = particles[k];
-            if (pt.square) {
-                ctx.strokeStyle = 'rgba(' + rgb.join(',') + ',0.5)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(pt.x - pt.r, pt.y - pt.r, pt.r * 2, pt.r * 2);
-            } else {
-                ctx.fillStyle = 'rgba(' + rgb.join(',') + ',0.45)';
+            ctx.strokeStyle = 'rgba(' + rgb.join(',') + ',0.18)';
+            ctx.lineWidth = 1;
+            c.lines.forEach(function (pair) {
+                var a = abs[pair[0]];
+                var b = abs[pair[1]];
                 ctx.beginPath();
-                ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
+                ctx.moveTo(a[0], a[1]);
+                ctx.lineTo(b[0], b[1]);
+                ctx.stroke();
+            });
+
+            abs.forEach(function (pos, i) {
+                var twinkle = reduceMotion ? 1 : 0.8 + 0.2 * Math.sin(t * 0.0012 + group.twinklePhases[i]);
+                var isBright = c.bright.indexOf(i) !== -1;
+                var base = (isBright ? 2.6 : 1.7) * group.sizeJitter[i];
+                drawStar(pos[0], pos[1], base * twinkle, 0.75 * twinkle, rgb);
+            });
+        });
     }
 
     function loop() {
